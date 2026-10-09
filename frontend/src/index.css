@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0B0B0C;
+  color: #18181B;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light Section Dotted Background Pattern (Exactly matches reference top half) */
+.bg-dots-light {
+  background-color: #F8F9FA;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+/* Dark Section Dotted Background Pattern (Exactly matches reference bottom half) */
+.bg-dots-dark {
+  background-color: #070708;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+/* Iridescent Holographic Shimmer Effect */
+.holographic-gradient {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 25%, #4ECDC4 50%, #1A535C 75%, #A06CD5 100%);
+  background-size: 300% 300%;
+  animation: holo-shift 8s ease infinite;
+}
+
+@keyframes holo-shift {
+  0% { background-position: 0% 50% }
+  50% { background-position: 100% 50% }
+  100% { background-position: 0% 50% }
+}
+
+/* 3D Glossy Squircle Card */
+.squircle-3d {
+  border-radius: 28px;
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+    0 2px 4px rgba(255, 255, 255, 0.4) inset;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.squircle-3d:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 
+    0 30px 60px -15px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset,
+    0 2px 6px rgba(255, 255, 255, 0.6) inset;
+}
+
+/* Reference Bento Vertical Cards */
+.bento-card-coral {
+  background: linear-gradient(180deg, #FF5733 0%, #E63E1B 65%, #0B0B0C 65.1%, #0B0B0C 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 32px;
+  overflow: hidden;
+}
+
+.bento-card-blue {
+  background: linear-gradient(180deg, #3B82F6 0%, #1D4ED8 65%, #0B0B0C 65.1%, #0B0B0C 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 32px;
+  overflow: hidden;
+}
+
+.bento-card-dark {
+  background: linear-gradient(180deg, #27272A 0%, #18181B 65%, #0B0B0C 65.1%, #0B0B0C 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 32px;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0B0C;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272A;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46;
+}

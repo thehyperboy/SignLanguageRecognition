@@ -1,0 +1,56 @@
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
+# Python Bytecode and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Generated Datasets & Raw Files
+dataset/*
+!dataset/README.md
+!dataset/**/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Model Artifacts & Checkpoints (keep production model weights & MediaPipe model task)
+models/*
+!models/README.md
+!models/**/.gitkeep
+!models/sign_language_lstm_best.keras
+!models/holistic_landmarker.task
+!models/training_history.json
+*.h5
+
+# Frontend Build & Node Modules
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+frontend/dist-ssr/
+
+# IDE & Agents
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+.agents/
+.gemini/
+
+# Secrets and Local Configurations
+.env
+.env.local
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
