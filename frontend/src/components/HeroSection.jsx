@@ -10,7 +10,13 @@ import {
 } from "./FloatingSquircle";
 import { ArrowDown, Sparkles } from "lucide-react";
 
-export const HeroSection = ({ onScrollToDemo, onOpenTracker, isCameraActive, onToggleCamera }) => {
+export const HeroSection = ({ 
+  onScrollToDemo, 
+  onOpenTracker, 
+  isCameraActive, 
+  onToggleCamera,
+  onOpenAuth = null
+}) => {
   return (
     <section className="relative w-full bg-dots-light py-20 md:py-28 overflow-hidden border-b border-zinc-200">
       
@@ -59,18 +65,20 @@ export const HeroSection = ({ onScrollToDemo, onOpenTracker, isCameraActive, onT
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-200/80 border border-zinc-300 text-zinc-800 text-[11px] font-bold tracking-wide uppercase mb-6 shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-zinc-200/90 shadow-sm text-xs font-semibold text-zinc-800 mb-6"
         >
-          <Sparkles className="w-3.5 h-3.5 text-zinc-900" />
-          <span>Bi-Directional Neural Accessibility</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Universal Communication Engine</span>
+          <span className="text-zinc-300">•</span>
+          <span className="text-zinc-500 font-mono text-[11px]">v2.4-LSTM</span>
         </motion.div>
 
-        {/* Main Title: Sign Language Recognition */}
+        {/* Massive Reference Heading */}
         <motion.h1
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-4xl sm:text-6xl md:text-7xl font-black text-zinc-950 tracking-tight leading-[1.08] mb-6"
+          className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight text-zinc-950 uppercase leading-[0.92] mb-6 select-none"
         >
           Sign Language <br className="hidden sm:inline" />
           Recognition
@@ -91,7 +99,7 @@ export const HeroSection = ({ onScrollToDemo, onOpenTracker, isCameraActive, onT
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="flex flex-col sm:flex-row items-center justify-center gap-3.5"
         >
           <button
             onClick={onOpenTracker || onScrollToDemo}
@@ -100,6 +108,16 @@ export const HeroSection = ({ onScrollToDemo, onOpenTracker, isCameraActive, onT
             <span>Try Live Recognition</span>
             <span className="text-sm">→</span>
           </button>
+
+          {onOpenAuth && (
+            <button
+              onClick={() => onOpenAuth("signup")}
+              className="px-7 py-3.5 rounded-full bg-white hover:bg-zinc-100 text-zinc-900 text-xs font-bold tracking-wider uppercase transition-all shadow-md active:scale-95 flex items-center gap-2 border border-zinc-200"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
+              <span>Create Free Account</span>
+            </button>
+          )}
         </motion.div>
 
       </div>
@@ -107,3 +125,5 @@ export const HeroSection = ({ onScrollToDemo, onOpenTracker, isCameraActive, onT
     </section>
   );
 };
+
+export default HeroSection;

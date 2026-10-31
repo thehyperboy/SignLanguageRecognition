@@ -155,7 +155,7 @@ export const GestureLibraryPage = ({ onBackToHome, onOpenTrackerWithSign }) => {
                 placeholder="Search gestures..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-zinc-900 border border-zinc-800 rounded-full pl-9 pr-4 py-2 text-xs text-white placeholder-zinc-500 outline-none focus:border-zinc-600 transition-colors w-44 sm:w-56"
+                className="bg-zinc-900 border border-zinc-800 rounded-full pl-9 pr-4 py-2 text-xs text-white placeholder-zinc-500 outline-none focus:border-zinc-600 transition-colors w-full sm:w-56"
               />
             </div>
           </div>

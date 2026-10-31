@@ -19,6 +19,9 @@ import sys
 import time
 import base64
 import json
+import hashlib
+import secrets
+import uuid
 from pathlib import Path
 
 import cv2
@@ -198,7 +201,7 @@ def process_b64_image(b64_str: str) -> dict:
     now = time.perf_counter()
     spoken = False
 
-    if pred in SPEECH_LABEL_MAP and conf >= 0.65:
+    if pred in SPEECH_LABEL_MAP and conf >= 0.48:
         if pred != last_spoken_sign or (now - last_speech_time) >= 2.0:
             speak_text(SPEECH_LABEL_MAP[pred])
             last_spoken_sign = pred
@@ -274,11 +277,186 @@ async def websocket_stream(websocket: WebSocket):
         print("[API] WebSocket client session closed.")
 
 
+# ============================================================
+# USER AUTHENTICATION & SESSION PERSISTENCE
+# ============================================================
+
+USERS_DB_PATH = Path(ROOT) / "data" / "users.json"
+ACTIVE_SESSIONS = {}  # token -> email
+
+def hash_password(password: str, salt: str = None) -> tuple[str, str]:
+    if not salt:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return hashed, salt
+
+def verify_password(password: str, hashed: str, salt: str) -> bool:
+    calc_hash, _ = hash_password(password, salt)
+    return secrets.compare_digest(calc_hash, hashed)
+
+def load_users() -> dict:
+    if not USERS_DB_PATH.exists():
+        USERS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        demo_hashed, demo_salt = hash_password("password123")
+        initial_users = {
+            "demo@signflow.ai": {
+                "id": "usr_demo_001",
+                "name": "Alex Morgan",
+                "email": "demo@signflow.ai",
+                "password_hash": demo_hashed,
+                "salt": demo_salt,
+                "role": "ASL Learner",
+                "createdAt": "2026-10-30T12:00:00Z"
+            }
+        }
+        with open(USERS_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(initial_users, f, indent=2)
+        return initial_users
+    try:
+        with open(USERS_DB_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_users(users: dict):
+    USERS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(USERS_DB_PATH, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
+
+async def auth_signup(request):
+    """POST /api/auth/signup - Register new account"""
+    try:
+        body = await request.json()
+        email = body.get("email", "").strip().lower()
+        password = body.get("password", "")
+        name = body.get("name", "").strip()
+        role = body.get("role", "ASL Learner")
+
+        if not email or "@" not in email:
+            return JSONResponse({"error": "A valid email address is required"}, status_code=400)
+        if not password or len(password) < 6:
+            return JSONResponse({"error": "Password must be at least 6 characters long"}, status_code=400)
+        if not name:
+            name = email.split("@")[0].title()
+
+        users = load_users()
+        if email in users:
+            return JSONResponse({"error": "An account with this email already exists"}, status_code=409)
+
+        pwd_hash, salt = hash_password(password)
+        user_id = f"usr_{uuid.uuid4().hex[:10]}"
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        new_user = {
+            "id": user_id,
+            "name": name,
+            "email": email,
+            "password_hash": pwd_hash,
+            "salt": salt,
+            "role": role,
+            "createdAt": now_iso
+        }
+        users[email] = new_user
+        save_users(users)
+
+        token = f"sftk_{secrets.token_urlsafe(32)}"
+        ACTIVE_SESSIONS[token] = email
+
+        return JSONResponse({
+            "success": True,
+            "message": "Account created successfully",
+            "token": token,
+            "user": {
+                "id": user_id,
+                "name": name,
+                "email": email,
+                "role": role,
+                "createdAt": now_iso
+            }
+        })
+    except Exception as exc:
+        return JSONResponse({"error": f"Registration failed: {str(exc)}"}, status_code=500)
+
+async def auth_login(request):
+    """POST /api/auth/login - Authenticate user"""
+    try:
+        body = await request.json()
+        email = body.get("email", "").strip().lower()
+        password = body.get("password", "")
+
+        if not email or not password:
+            return JSONResponse({"error": "Email and password are required"}, status_code=400)
+
+        users = load_users()
+        user = users.get(email)
+        if not user or not verify_password(password, user["password_hash"], user["salt"]):
+            return JSONResponse({"error": "Invalid email or password"}, status_code=401)
+
+        token = f"sftk_{secrets.token_urlsafe(32)}"
+        ACTIVE_SESSIONS[token] = email
+
+        return JSONResponse({
+            "success": True,
+            "message": f"Welcome back, {user['name']}!",
+            "token": token,
+            "user": {
+                "id": user["id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": user.get("role", "ASL Learner"),
+                "createdAt": user.get("createdAt")
+            }
+        })
+    except Exception as exc:
+        return JSONResponse({"error": f"Login failed: {str(exc)}"}, status_code=500)
+
+async def auth_me(request):
+    """GET /api/auth/me - Get current logged-in user profile"""
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip()
+    if not token or token not in ACTIVE_SESSIONS:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+    
+    email = ACTIVE_SESSIONS[token]
+    users = load_users()
+    user = users.get(email)
+    if not user:
+        return JSONResponse({"error": "User not found"}, status_code=404)
+
+    return JSONResponse({
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "role": user.get("role", "ASL Learner"),
+            "createdAt": user.get("createdAt")
+        }
+    })
+
+async def auth_forgot_password(request):
+    """POST /api/auth/forgot-password - Simulated password reset request"""
+    try:
+        body = await request.json()
+        email = body.get("email", "").strip().lower()
+        if not email:
+            return JSONResponse({"error": "Email is required"}, status_code=400)
+        return JSONResponse({
+            "success": True,
+            "message": f"If an account with {email} exists, password reset instructions have been dispatched."
+        })
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 routes = [
     Route("/api/health", health, methods=["GET"]),
     Route("/api/vocabulary", get_vocabulary, methods=["GET"]),
     Route("/api/reset", reset_buffer, methods=["POST"]),
     Route("/api/predict", predict_http, methods=["POST"]),
+    Route("/api/auth/signup", auth_signup, methods=["POST"]),
+    Route("/api/auth/login", auth_login, methods=["POST"]),
+    Route("/api/auth/me", auth_me, methods=["GET"]),
+    Route("/api/auth/forgot-password", auth_forgot_password, methods=["POST"]),
     WebSocketRoute("/ws/stream", websocket_stream),
 ]
 

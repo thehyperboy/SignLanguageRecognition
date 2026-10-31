@@ -517,7 +517,7 @@ def build_hud_html(res: dict, last_spoken: str, last_spoken_time: float) -> str:
     formatted_sign = DISPLAY_LABEL_MAP.get(pred_label, pred_label.upper())
     buffer_pct = int(min(frames / float(SEQUENCE_LENGTH), 1.0) * 100)
 
-    is_recognized = is_latched or (pred_label in DISPLAY_LABEL_MAP and pred_label not in ("Waiting...", "Uncertain") and conf_val >= 0.60)
+    is_recognized = is_latched or (pred_label in DISPLAY_LABEL_MAP and pred_label not in ("Waiting...", "Uncertain") and conf_val >= 0.45)
 
     if is_recognized:
         status_text = "Gesture Recognized"
@@ -527,7 +527,7 @@ def build_hud_html(res: dict, last_spoken: str, last_spoken_time: float) -> str:
         conf_display = f"{conf_val * 100.0:.1f}% Confidence"
         conf_class = ""
     elif hand_detected:
-        if frames < 12:
+        if frames < 8:
             status_text = f"Tracking Motion ({frames}/{SEQUENCE_LENGTH})"
             status_dot = "#FF9500"
             sign_display = "Tracking..."
@@ -537,8 +537,8 @@ def build_hud_html(res: dict, last_spoken: str, last_spoken_time: float) -> str:
         else:
             status_text = "Classifying Sequence"
             status_dot = "#007AFF"
-            sign_display = formatted_sign if conf_val >= 0.55 else "Evaluating..."
-            sign_class = "" if conf_val >= 0.55 else " waiting"
+            sign_display = formatted_sign if conf_val >= 0.45 else "Evaluating..."
+            sign_class = "" if conf_val >= 0.45 else " waiting"
             conf_display = f"{conf_val * 100.0:.1f}% Confidence"
             conf_class = ""
     else:
@@ -759,7 +759,7 @@ if current_view == "Live Tracking":
                 active_conf = res.get("display_confidence", 0.0) if res.get("display_confidence", 0.0) > 0 else res.get("confidence", 0.0)
                 curr_t = time.perf_counter()
 
-                if active_pred in SPEECH_LABEL_MAP and active_conf >= 0.65:
+                if active_pred in SPEECH_LABEL_MAP and active_conf >= 0.48:
                     if active_pred != last_spoken_sign or (curr_t - last_speech_time) >= 2.0:
                         speak_text(SPEECH_LABEL_MAP[active_pred])
                         last_spoken_sign = active_pred

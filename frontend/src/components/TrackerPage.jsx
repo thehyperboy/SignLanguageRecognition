@@ -93,18 +93,18 @@ export const TrackerPage = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <button
               onClick={onResetBuffer}
               title="Reset temporal sequence buffer"
-              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-2 transition-all border border-zinc-700 shadow-sm active:scale-95"
+              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-3 sm:px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-2 transition-all border border-zinc-700 shadow-sm active:scale-95"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Buffer</span>
+              <span className="hidden sm:inline">Reset Buffer</span>
             </button>
             <button
               onClick={onToggleCamera}
-              className={`px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 ${
+              className={`px-4 sm:px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 ${
                 isCameraActive 
                   ? "bg-rose-600/90 hover:bg-rose-700 text-white" 
                   : "bg-white text-black hover:bg-zinc-200"
@@ -148,14 +148,27 @@ export const TrackerPage = ({
           </motion.div>
         )}
 
+        {/* Offline mode banner */}
+        {connectionStatus !== "connected" && (
+          <div className="mb-6 p-4 rounded-2xl border border-amber-500/50 bg-amber-950/40 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+              <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Backend Offline</span>
+            </div>
+            <p className="text-xs text-amber-200/80">
+              The Python AI server is not running. Start it with <code className="bg-amber-900/40 px-1.5 py-0.5 rounded font-mono text-[11px]">python api_server.py</code> to enable live gesture recognition. The UI still works in static demo mode.
+            </p>
+          </div>
+        )}
+
         {/* 3-Column Tracker Layout matching reference bento cards style */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
 
           {/* ========================================================= */}
           {/* PANEL 1: LIVE WEBCAM & LANDMARK OVERLAY (Coral Accent)    */}
           {/* ========================================================= */}
           <div className="bento-card-coral flex flex-col justify-between shadow-2xl relative">
-            <div className="p-6 relative flex flex-col flex-grow min-h-[440px]">
+            <div className="p-6 relative flex flex-col flex-grow min-h-[360px] sm:min-h-[440px]">
               
               {/* Header Badge & Mode Toggles */}
               <div className="flex items-center justify-between mb-4 z-10 gap-2">
@@ -287,7 +300,7 @@ export const TrackerPage = ({
           {/* PANEL 2: NEURAL CONSOLE & PREDICTIONS (Blue Accent)       */}
           {/* ========================================================= */}
           <div className="bento-card-blue flex flex-col justify-between shadow-2xl relative">
-            <div className="p-6 relative flex flex-col flex-grow min-h-[440px]">
+            <div className="p-6 relative flex flex-col flex-grow min-h-[360px] sm:min-h-[440px]">
               
               {/* Header */}
               <div className="flex items-center justify-between mb-4 z-10">
@@ -400,7 +413,7 @@ export const TrackerPage = ({
           {/* PANEL 3: GESTURE MATRIX & PRACTICE (Charcoal Accent)      */}
           {/* ========================================================= */}
           <div className="bento-card-charcoal flex flex-col justify-between shadow-2xl relative">
-            <div className="p-6 relative flex flex-col flex-grow min-h-[440px]">
+            <div className="p-6 relative flex flex-col flex-grow min-h-[360px] sm:min-h-[440px]">
               
               {/* Header */}
               <div className="flex items-center justify-between mb-4 z-10">

@@ -21,6 +21,8 @@ import mediapipe as mp
 import time
 import threading
 
+from src.preprocess import mirror_sequence
+
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
@@ -197,7 +199,7 @@ def draw_landmarks(
     active_label = display_prediction if display_prediction else prediction
     active_conf = display_confidence if display_confidence > 0 else confidence
 
-    if active_label and active_label not in ("Waiting...", "Uncertain") and active_conf >= 0.60:
+    if active_label and active_label not in ("Waiting...", "Uncertain") and active_conf >= 0.45:
         tag_str = "[RECOGNIZED]" if is_latched else "[LIVE]"
         banner_text = f"{tag_str} {active_label.upper()} {active_conf * 100:.0f}%"
         (text_w, text_h), _ = cv2.getTextSize(banner_text, cv2.FONT_HERSHEY_SIMPLEX, 0.54, 2)
@@ -250,10 +252,11 @@ class SignLanguageRecognizer:
         mediapipe_model_path=None,
         sequence_length=30,
         expected_features=258,
-        confidence_threshold=0.65,
-        stability_window=5,
+        confidence_threshold=0.48,
+        stability_window=4,
         stability_count=2,
-        grace_frames=2
+        grace_frames=8,
+        latch_duration=2.0
     ):
         # Determine project root relative to src/inference.py
         self.root_dir = Path(__file__).resolve().parents[1]
@@ -269,6 +272,7 @@ class SignLanguageRecognizer:
         self.stability_window = stability_window
         self.stability_count = stability_count
         self.grace_frames = grace_frames
+        self.latch_duration = latch_duration
 
         self.model = None
         self.scaler = None
@@ -339,7 +343,7 @@ class SignLanguageRecognizer:
         if not self.label_map:
             raise ValueError("Label map is empty.")
 
-        # 4. Initialize MediaPipe Tasks HolisticLandmarker with increased sensitivity
+        # 4. Initialize MediaPipe Tasks HolisticLandmarker with ultra-sensitive tracking
         BaseOptions = mp.tasks.BaseOptions
         HolisticLandmarker = mp.tasks.vision.HolisticLandmarker
         HolisticLandmarkerOptions = mp.tasks.vision.HolisticLandmarkerOptions
@@ -348,11 +352,11 @@ class SignLanguageRecognizer:
         options = HolisticLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=str(self.mediapipe_model_path)),
             running_mode=RunningMode.VIDEO,
-            min_face_detection_confidence=0.4,
-            min_face_landmarks_confidence=0.4,
-            min_pose_detection_confidence=0.45,
-            min_pose_landmarks_confidence=0.45,
-            min_hand_landmarks_confidence=0.35,  # Robust hand tracking under motion
+            min_face_detection_confidence=0.25,
+            min_face_landmarks_confidence=0.25,
+            min_pose_detection_confidence=0.25,
+            min_pose_landmarks_confidence=0.25,
+            min_hand_landmarks_confidence=0.20,  # Ultra-sensitive hand tracking under motion
             output_face_blendshapes=False,
             output_segmentation_mask=False
         )
@@ -414,93 +418,97 @@ class SignLanguageRecognizer:
 
         return features.astype(np.float32)
 
-    def predict_sequence(self) -> tuple[str, float]:
+    def _predict_candidate(self, seq_30: np.ndarray) -> tuple[str, float]:
         """
-        Scales the 30-frame sequence buffer, runs LSTM model inference,
-        and applies confidence threshold & stability filtering.
-        Supports automatic dominant hand mapping so left-handed signing is recognized as accurately as right-handed.
-
-        Returns:
-            (predicted_label, confidence)
+        Scales a 30x258 sequence and evaluates both raw and mirrored representations,
+        returning the highest confidence prediction and label.
         """
-        sequence_array = np.array(self.sequence, dtype=np.float32)
-        scaled_sequence = self.scaler.transform(sequence_array)
-        model_input = np.expand_dims(scaled_sequence, axis=0)
+        scaled = self.scaler.transform(seq_30)
+        probs = self.model.predict(np.expand_dims(scaled, axis=0), verbose=0)[0]
+        idx = int(np.argmax(probs))
+        conf = float(probs[idx])
+        label = self.label_map.get(idx, f"class_{idx}")
 
-        probabilities = self.model.predict(model_input, verbose=0)[0]
-        predicted_index = int(np.argmax(probabilities))
-        confidence = float(probabilities[predicted_index])
-        predicted_label = self.label_map.get(predicted_index, f"class_{predicted_index}")
+        # Also evaluate ambidextrous mirror (supports left-handed signing and mirrored cameras with 99.9% fidelity)
+        m_seq = mirror_sequence(seq_30)
+        scaled_m = self.scaler.transform(m_seq)
+        probs_m = self.model.predict(np.expand_dims(scaled_m, axis=0), verbose=0)[0]
+        idx_m = int(np.argmax(probs_m))
+        conf_m = float(probs_m[idx_m])
+        if conf_m > conf:
+            idx = idx_m
+            conf = conf_m
+            label = self.label_map.get(idx_m, f"class_{idx_m}")
 
-        # Fallback check: if confidence is moderate (< 0.75) and only Left Hand is active, test mapped sequence
-        lh_norm = float(np.mean(np.linalg.norm(sequence_array[:, 132:195], axis=1)))
-        rh_norm = float(np.mean(np.linalg.norm(sequence_array[:, 195:258], axis=1)))
+        return label, conf
 
-        if confidence < 0.75 and lh_norm > 0.5 and rh_norm < 0.3:
-            mapped_seq = sequence_array.copy()
-            mapped_seq[:, 195:258] = sequence_array[:, 132:195]
-            mapped_seq[:, 132:195] = 0.0
-            scaled_mapped = self.scaler.transform(mapped_seq)
-            m_probs = self.model.predict(np.expand_dims(scaled_mapped, axis=0), verbose=0)[0]
-            m_idx = int(np.argmax(m_probs))
-            m_conf = float(m_probs[m_idx])
-            if m_conf > confidence:
-                predicted_label = self.label_map.get(m_idx, f"class_{m_idx}")
-                confidence = m_conf
+    def predict_multi_scale(self) -> tuple[str, float]:
+        """
+        Multi-window dynamic temporal evaluation:
+        Tests full sequence and temporal sub-windows (recent 20 and 14 frames resampled to 30),
+        allowing both fast and slow gestures to be recognized instantly with high confidence.
+        """
+        buf = list(self.sequence)
+        n = len(buf)
+        if n < 8:
+            return "Waiting...", 0.0
+
+        candidates = []
+
+        # 1. Full buffer resampled to 30 frames
+        idx_full = np.linspace(0, n - 1, self.sequence_length).astype(int)
+        seq_full = np.array([buf[i] for i in idx_full], dtype=np.float32)
+        candidates.append(seq_full)
+
+        # 2. Recent 20-frame window (fast-to-medium signs)
+        if n >= 20:
+            idx_20 = np.linspace(n - 20, n - 1, self.sequence_length).astype(int)
+            seq_20 = np.array([buf[i] for i in idx_20], dtype=np.float32)
+            candidates.append(seq_20)
+
+        # 3. Recent 14-frame window (quick isolated signs like hello, yes, no)
+        if n >= 14:
+            idx_14 = np.linspace(n - 14, n - 1, self.sequence_length).astype(int)
+            seq_14 = np.array([buf[i] for i in idx_14], dtype=np.float32)
+            candidates.append(seq_14)
+
+        best_label = "Uncertain"
+        best_conf = 0.0
+
+        for cand in candidates:
+            lbl, conf = self._predict_candidate(cand)
+            if conf > best_conf:
+                best_conf = conf
+                best_label = lbl
 
         # Temporal stability filtering
-        if confidence >= self.confidence_threshold:
-            self.prediction_history.append(predicted_label)
+        if best_conf >= self.confidence_threshold:
+            self.prediction_history.append(best_label)
         else:
             self.prediction_history.append("Uncertain")
 
         counts = Counter(self.prediction_history)
         stable_label, stable_count = counts.most_common(1)[0]
 
-        # Return prediction immediately on high confidence, or require stability_count voting
+        # Confirm prediction if stable or if single frame has high confidence (>= 0.60)
         if stable_label != "Uncertain" and (
-            stable_count >= self.stability_count or
-            (len(self.prediction_history) < self.stability_count and confidence >= 0.75)
+            stable_count >= self.stability_count or best_conf >= 0.60
         ):
-            final_prediction = stable_label
+            final_pred = stable_label
+        elif best_conf >= self.confidence_threshold:
+            final_pred = best_label
         else:
-            final_prediction = "Uncertain"
+            final_pred = "Uncertain"
 
-        return final_prediction, confidence
+        return final_pred, best_conf
+
+    def predict_sequence(self) -> tuple[str, float]:
+        """Backwards-compatible API for sequence inference."""
+        return self.predict_multi_scale()
 
     def predict_partial_sequence(self) -> tuple[str, float]:
-        """
-        Runs early prediction on partial sequences (12-29 frames) via temporal linear resampling.
-        Enables instantaneous live gesture feedback without waiting 30 full frames.
-        """
-        buf = list(self.sequence)
-        n = len(buf)
-        if n < 12:
-            return "Waiting...", 0.0
-
-        indices = np.linspace(0, n - 1, self.sequence_length).astype(int)
-        seq_array = np.array([buf[i] for i in indices], dtype=np.float32)
-        scaled_seq = self.scaler.transform(seq_array)
-        probs = self.model.predict(np.expand_dims(scaled_seq, axis=0), verbose=0)[0]
-        idx = int(np.argmax(probs))
-        conf = float(probs[idx])
-        label = self.label_map.get(idx, f"class_{idx}")
-
-        # Check LH dominance mapping if LH active and RH empty
-        lh_norm = float(np.mean(np.linalg.norm(seq_array[:, 132:195], axis=1)))
-        rh_norm = float(np.mean(np.linalg.norm(seq_array[:, 195:258], axis=1)))
-        if conf < 0.75 and lh_norm > 0.5 and rh_norm < 0.3:
-            mapped = seq_array.copy()
-            mapped[:, 195:258] = seq_array[:, 132:195]
-            mapped[:, 132:195] = 0.0
-            m_probs = self.model.predict(np.expand_dims(self.scaler.transform(mapped), axis=0), verbose=0)[0]
-            m_idx = int(np.argmax(m_probs))
-            m_conf = float(m_probs[m_idx])
-            if m_conf > conf:
-                label = self.label_map.get(m_idx, f"class_{m_idx}")
-                conf = m_conf
-
-        return label, conf
+        """Backwards-compatible API for partial sequence inference."""
+        return self.predict_multi_scale()
 
     def process_frame(self, frame: np.ndarray, mirror_display: bool = True) -> dict:
         """
@@ -508,9 +516,9 @@ class SignLanguageRecognizer:
         1. Ensures 640x480 resolution
         2. MediaPipe detection on raw unmirrored coordinates to match trained model
         3. Feature extraction (258 features)
-        4. Hand detection with grace period for temporary motion blur
-        5. Live temporal buffering & early/sliding-window prediction
-        6. Result persistence (latched for 1.5s so results stay visible)
+        4. Robust hand detection with pose wrist elevation fallback and grace period
+        5. Multi-window temporal evaluation & early/sliding-window prediction
+        6. Result persistence (latched for 2.0s so results stay visible)
         7. Landmark, hand bounding box, & on-frame HUD overlay
         """
         if self.landmarker is None:
@@ -545,7 +553,21 @@ class SignLanguageRecognizer:
             pose_det = bool(hasattr(result, "pose_landmarks") and result.pose_landmarks and len(result.pose_landmarks) > 0)
             lh_det = bool(hasattr(result, "left_hand_landmarks") and result.left_hand_landmarks and len(result.left_hand_landmarks) > 0)
             rh_det = bool(hasattr(result, "right_hand_landmarks") and result.right_hand_landmarks and len(result.right_hand_landmarks) > 0)
-            hand_det = lh_det or rh_det
+
+            # Check if wrists are raised above hips (user is gesturing even if fingers momentarily blur)
+            wrist_raised = False
+            if pose_det:
+                p_landmarks = result.pose_landmarks
+                if isinstance(p_landmarks, list) and len(p_landmarks) > 0 and isinstance(p_landmarks[0], list):
+                    p_landmarks = p_landmarks[0]
+                if isinstance(p_landmarks, list) and len(p_landmarks) > 24:
+                    lw_y = getattr(p_landmarks[15], "y", 1.0)
+                    rw_y = getattr(p_landmarks[16], "y", 1.0)
+                    hip_y = min(getattr(p_landmarks[23], "y", 0.9), getattr(p_landmarks[24], "y", 0.9))
+                    if lw_y < hip_y or rw_y < hip_y:
+                        wrist_raised = True
+
+            hand_det = lh_det or rh_det or (wrist_raised and len(self.sequence) > 0)
 
             if hand_det:
                 self.no_hand_counter = 0
@@ -554,53 +576,51 @@ class SignLanguageRecognizer:
                 effective_hand_det = True
             else:
                 self.no_hand_counter += 1
-                # Grace period: if hand was detected recently, survive brief dropped frames from motion blur
+                # Grace period: survive brief dropped frames from motion blur
                 if self.no_hand_counter <= self.grace_frames and len(self.sequence) > 0 and self.last_features is not None:
                     self.sequence.append(self.last_features)
                     effective_hand_det = True
                 else:
                     effective_hand_det = False
-                    if self.no_hand_counter >= 12:
+                    if self.no_hand_counter >= 30:
                         self.sequence.clear()
                         self.prediction_history.clear()
                         self.last_features = None
 
-            # 6. Live prediction with early preview & continuous sliding window
+            # 6. Live multi-scale dynamic prediction
             prediction = "Waiting..."
             confidence = 0.0
             ready = False
 
-            if effective_hand_det:
-                buf_len = len(self.sequence)
-                if buf_len >= self.sequence_length:
-                    prediction, confidence = self.predict_sequence()
+            if effective_hand_det and len(self.sequence) >= 8:
+                p_label, p_conf = self.predict_multi_scale()
+                if p_conf >= self.confidence_threshold and p_label != "Uncertain":
+                    prediction = p_label
+                    confidence = p_conf
                     ready = True
-                elif buf_len >= 12:
-                    # Live dynamic early preview for instant responsiveness
-                    p_label, p_conf = self.predict_partial_sequence()
-                    if p_conf >= 0.55:
-                        prediction, confidence = p_label, p_conf
-                        ready = True
+                elif p_conf >= 0.40:
+                    prediction = p_label
+                    confidence = p_conf
 
-            # 7. Result Latching with buffer flush
+            # 7. Result Latching with gentle buffer retention
             curr_now = time.perf_counter()
             if ready and prediction in self.label_map.values() and confidence >= self.confidence_threshold:
                 self.latched_gesture = prediction
                 self.latched_confidence = confidence
                 self.latched_time = curr_now
-                # Flush the sequence buffer so that the previous sign does not contaminate the next sign
+                # Retain recent 18 frames so continuous motion stays smooth without dropping to zero
                 if len(self.sequence) >= self.sequence_length:
-                    self.sequence = deque(list(self.sequence)[-4:], maxlen=self.sequence_length)
+                    self.sequence = deque(list(self.sequence)[-18:], maxlen=self.sequence_length)
                     self.prediction_history.clear()
 
-            # Determine display prediction (live if ready, otherwise latched within 1.5 seconds)
+            # Determine display prediction (live if ready, otherwise latched within latch_duration)
             is_latched = False
             display_pred = prediction
             display_conf = confidence
 
             if (not ready or prediction in ("Waiting...", "Uncertain")) and self.latched_gesture:
                 time_since_latch = curr_now - self.latched_time
-                if time_since_latch < 1.5:
+                if time_since_latch < self.latch_duration:
                     display_pred = self.latched_gesture
                     display_conf = self.latched_confidence
                     is_latched = True

@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Cookie, ShieldCheck } from "lucide-react";
 
 const TwitterIcon = () => (
   <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -27,9 +27,13 @@ const GithubIcon = () => (
   </svg>
 );
 
-export const MascotCookie = () => (
-  <div className="relative w-20 h-20 select-none cursor-pointer group">
-    {/* 3D Chocolate Chip Cookie with Bite & Face (Exact match to reference bottom character) */}
+export const MascotCookie = ({ onOpenCookieModal = null }) => (
+  <div 
+    onClick={onOpenCookieModal}
+    title="Click to view Cookie & Privacy Settings"
+    className="relative w-20 h-20 select-none cursor-pointer group"
+  >
+    {/* 3D Chocolate Chip Cookie with Bite & Face */}
     <div className="w-20 h-20 rounded-full bg-gradient-to-b from-[#C48C56] via-[#B27943] to-[#8C5728] relative shadow-2xl flex items-center justify-center border-2 border-[#D9A36E]/40 overflow-hidden group-hover:scale-105 transition-transform">
       {/* Cookie Bite out of top-left */}
       <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-[#070708]" />
@@ -51,68 +55,154 @@ export const MascotCookie = () => (
   </div>
 );
 
-export const Footer = () => {
+export const Footer = ({ 
+  onOpenAuth = null,
+  cookieConsent = null,
+  onAcceptCookies = null,
+  onRejectCookies = null,
+  onOpenCookieModal = null
+}) => {
   return (
-    <footer className="w-full bg-[#070708] border-t border-zinc-900 py-16 px-6 sm:px-12 text-zinc-400">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
+    <footer className="w-full bg-[#070708] border-t border-zinc-900 py-10 sm:py-16 px-4 sm:px-8 md:px-12 text-zinc-400 select-none">
+      <div className="max-w-7xl mx-auto flex flex-col items-center gap-8 md:flex-row md:items-start md:justify-between md:gap-10">
         
-        {/* Left: Copyright & Legal (Exact reference match) */}
-        <div className="flex flex-col items-center md:items-start gap-3">
+        {/* Left: Copyright & Legal */}
+        <div className="flex flex-col items-center md:items-start gap-3 w-full md:w-auto">
           <div className="flex items-center gap-2 text-xs font-bold text-white tracking-widest uppercase">
             <span className="w-2 h-2 rounded-full bg-white" />
             <span>©2026 WGMI • SignFlow</span>
           </div>
-          <div className="flex items-center gap-4 text-[11px] font-semibold text-zinc-500">
-            <a href="#demo-section" className="hover:text-zinc-300 transition-colors">T&C's</a>
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-2 text-[11px] font-semibold text-zinc-500">
+            {onOpenAuth && (
+              <>
+                <button 
+                  onClick={() => onOpenAuth("login")}
+                  className="hover:text-zinc-200 transition-colors"
+                >
+                  LOG IN
+                </button>
+                <span>•</span>
+                <button 
+                  onClick={() => onOpenAuth("signup")}
+                  className="hover:text-zinc-200 transition-colors"
+                >
+                  SIGN UP
+                </button>
+                <span>•</span>
+              </>
+            )}
+            <button 
+              onClick={onOpenCookieModal} 
+              className="hover:text-zinc-200 transition-colors"
+            >
+              PRIVACY POLICY
+            </button>
             <span>•</span>
-            <a href="#demo-section" className="hover:text-zinc-300 transition-colors">VIEW CONTRACT</a>
+            <button 
+              onClick={onOpenCookieModal} 
+              className="hover:text-zinc-200 transition-colors"
+            >
+              T&C's
+            </button>
             <span>•</span>
-            <a href="#demo-section" className="hover:text-zinc-300 transition-colors">NEURAL REPO</a>
+            <a 
+              href="https://github.com" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="hover:text-zinc-300 transition-colors"
+            >
+              NEURAL REPO
+            </a>
           </div>
         </div>
 
-        {/* Center: Mailing List Pill (Exact reference match: Pill Input "Email Address →") */}
-        <div className="flex flex-col items-center gap-2">
+        {/* Center: Mailing List Pill */}
+        <div className="flex flex-col items-center gap-2 w-full md:w-auto">
           <span className="text-[10px] font-black tracking-widest text-zinc-500 uppercase">
             MAILING LIST
           </span>
           <form 
             onSubmit={(e) => { e.preventDefault(); alert("Subscribed to SignFlow updates!"); }}
-            className="flex items-center bg-zinc-900/90 border border-zinc-700/80 rounded-full pl-5 pr-2 py-1.5 focus-within:border-white transition-all shadow-inner"
+            className="flex items-center bg-zinc-900/90 border border-zinc-700/80 rounded-full pl-5 pr-2 py-1.5 focus-within:border-white transition-all shadow-inner w-full max-w-xs"
           >
             <input 
               type="email" 
               placeholder="Email Address" 
-              className="bg-transparent text-xs text-white placeholder-zinc-500 outline-none w-44 sm:w-52"
+              className="bg-transparent text-xs text-white placeholder-zinc-500 outline-none flex-1 min-w-0"
             />
             <button 
               type="submit" 
-              className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-white text-zinc-400 hover:text-black flex items-center justify-center transition-all"
+              className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-white text-zinc-400 hover:text-black flex items-center justify-center transition-all shrink-0"
             >
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>
         </div>
 
-        {/* Mascot Center-Right (Exact reference character) */}
+        {/* Mascot Center-Right */}
         <div className="hidden lg:flex items-center">
-          <MascotCookie />
+          <MascotCookie onOpenCookieModal={onOpenCookieModal} />
         </div>
 
-        {/* Right: Cookies Policy & Social Icons (Exact reference match) */}
-        <div className="flex flex-col items-center md:items-end gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mr-2">
-              COOKIES POLICY
+        {/* Right: Cookies Policy Consent Controls & Social Icons */}
+        <div className="flex flex-col items-center md:items-end gap-3 w-full md:w-auto">
+          
+          {/* Functional Cookie Consent Controls */}
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mr-1 flex items-center gap-1">
+              <Cookie className="w-3 h-3 text-amber-400" />
+              <span>COOKIES POLICY</span>
             </span>
-            <button className="px-3.5 py-1 rounded-full text-[11px] font-bold bg-white text-black hover:bg-zinc-200 transition-colors">
-              Accept
-            </button>
-            <button className="px-3.5 py-1 rounded-full text-[11px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white transition-colors">
-              Find out more
-            </button>
+
+            {cookieConsent === "accepted" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-[11px] font-bold text-emerald-300 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Cookies Accepted</span>
+                <button 
+                  onClick={onOpenCookieModal}
+                  className="ml-1 text-zinc-400 hover:text-white underline text-[10px] cursor-pointer"
+                  title="Modify Cookie Settings"
+                >
+                  Manage
+                </button>
+              </div>
+            ) : cookieConsent === "rejected" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-[11px] font-bold text-zinc-300 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>Essential Only</span>
+                <button 
+                  onClick={onOpenCookieModal}
+                  className="ml-1 text-zinc-400 hover:text-white underline text-[10px] cursor-pointer"
+                  title="Modify Cookie Settings"
+                >
+                  Manage
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={onAcceptCookies}
+                  className="px-3.5 py-1 rounded-full text-[11px] font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-sm cursor-pointer"
+                >
+                  Accept
+                </button>
+                <button 
+                  onClick={onRejectCookies}
+                  className="px-3.5 py-1 rounded-full text-[11px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  Reject
+                </button>
+                <button 
+                  onClick={onOpenCookieModal}
+                  className="px-3 py-1 rounded-full text-[11px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  Find out more
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* Social Icons */}
           <div className="flex items-center gap-3 pt-1">
             <a href="https://twitter.com" target="_blank" rel="noreferrer" className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-600 transition-all">
               <TwitterIcon />
@@ -133,3 +223,5 @@ export const Footer = () => {
     </footer>
   );
 };
+
+export default Footer;

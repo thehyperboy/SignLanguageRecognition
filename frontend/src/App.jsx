@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "./components/Navbar";
 import { HeroSection } from "./components/HeroSection";
 import { BentoSection } from "./components/BentoSection";
@@ -6,10 +7,39 @@ import { TrackerPage } from "./components/TrackerPage";
 import { ArchitecturePage } from "./components/ArchitecturePage";
 import { GestureLibraryPage } from "./components/GestureLibraryPage";
 import { AccessibilityPage } from "./components/AccessibilityPage";
+import { AuthPage } from "./components/AuthPage";
+import { CookieBanner } from "./components/CookieBanner";
+import { CookiePolicyModal } from "./components/CookiePolicyModal";
 import { Footer } from "./components/Footer";
 
 export function App() {
   const [activeTab, setActiveTab] = useState("home");
+  const [authMode, setAuthMode] = useState("login"); // "login" | "signup"
+  const pendingTabRef = useRef(null); // tab user tried to access before signing in
+
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("signflow_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Cookie Consent State: 'accepted' | 'rejected' | object | null
+  const [cookieConsent, setCookieConsent] = useState(() => {
+    try {
+      const stored = localStorage.getItem("signflow_cookie_consent");
+      if (!stored) return null;
+      if (stored === "accepted" || stored === "rejected") return stored;
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  });
+
+  const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
+
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [mediaStream, setMediaStream] = useState(null);
   const [practiceSign, setPracticeSign] = useState(null);
@@ -35,8 +65,8 @@ export function App() {
   const isStreamingRef = useRef(false);
   const inFlightRef = useRef(false);
 
-  const API_BASE = "http://localhost:8000";
-  const WS_URL = "ws://localhost:8000/ws/stream";
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const WS_URL = (import.meta.env.VITE_WS_URL || "ws://localhost:8000") + "/ws/stream";
 
   // 1. Fetch Backend Health on Mount
   useEffect(() => {
@@ -52,7 +82,43 @@ export function App() {
       });
   }, []);
 
-  // 2. Camera Controls
+  // 2. Cookie Consent Handlers
+  const handleAcceptCookies = () => {
+    setCookieConsent("accepted");
+    try {
+      localStorage.setItem("signflow_cookie_consent", "accepted");
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
+  };
+
+  const handleRejectCookies = () => {
+    setCookieConsent("rejected");
+    try {
+      localStorage.setItem("signflow_cookie_consent", "rejected");
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
+  };
+
+  const handleSaveCustomConsent = (preferences) => {
+    setCookieConsent(preferences);
+    try {
+      localStorage.setItem("signflow_cookie_consent", JSON.stringify(preferences));
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
+  };
+
+  const handleOpenCookieModal = () => {
+    setIsCookieModalOpen(true);
+  };
+
+  const handleCloseCookieModal = () => {
+    setIsCookieModalOpen(false);
+  };
+
+  // 3. Camera Controls
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -120,7 +186,7 @@ export function App() {
     }
   }, [mediaStream]);
 
-  // 3. Frame Sender Function
+  // 4. Frame Sender Function
   const sendFrame = useCallback(() => {
     if (!isStreamingRef.current || inFlightRef.current) return;
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -146,7 +212,7 @@ export function App() {
     wsRef.current.send(b64Data);
   }, []);
 
-  // 4. WebSocket Manager
+  // 5. WebSocket Manager
   const connectWebSocket = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       isStreamingRef.current = true;
@@ -176,7 +242,6 @@ export function App() {
       }
       inFlightRef.current = false;
       if (isStreamingRef.current) {
-        // Immediately request next frame via requestAnimationFrame with ZERO artificial delay
         requestAnimationFrame(sendFrame);
       }
     };
@@ -204,7 +269,7 @@ export function App() {
     return () => clearInterval(watchdog);
   }, [sendFrame]);
 
-  // 5. Reset Recognition Buffer
+  // 6. Reset Recognition Buffer
   const handleResetBuffer = async () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send("RESET");
@@ -226,6 +291,13 @@ export function App() {
   };
 
   const handleOpenTracker = () => {
+    if (!user) {
+      pendingTabRef.current = "tracker";
+      setAuthMode("login");
+      setActiveTab("auth");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     setActiveTab("tracker");
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (!isCameraActive) {
@@ -233,11 +305,106 @@ export function App() {
     }
   };
 
+  // ─── Auth guard: tabs that require a signed-in user ───────────────────────
+  const PROTECTED_TABS = ["tracker", "matrix", "architecture", "accessibility"];
+
   const handleNavigate = (tabName) => {
-    setActiveTab(tabName);
+    if (!user && PROTECTED_TABS.includes(tabName)) {
+      // Remember where they wanted to go, then redirect to auth
+      pendingTabRef.current = tabName;
+      setAuthMode("login");
+      setActiveTab("auth");
+    } else {
+      setActiveTab(tabName);
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleOpenAuth = (mode = "login") => {
+    setAuthMode(mode);
+    setActiveTab("auth");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleAuthSuccess = (userData, token) => {
+    setUser(userData);
+    // After login, go to home (or the originally requested tab)
+    setActiveTab(pendingTabRef.current || "home");
+    pendingTabRef.current = null;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("signflow_user");
+    localStorage.removeItem("signflow_token");
+    setUser(null);
+    setActiveTab("home");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ─── Auth Gate: if not signed in, show only the auth page ──────────────────
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0B0B0C] text-white font-sans selection:bg-cyan-500 selection:text-black">
+        <AuthPage
+          initialMode={authMode}
+          onAuthSuccess={handleAuthSuccess}
+          onBackToHome={() => setAuthMode("login")}
+          onOpenTracker={handleOpenTracker}
+          isGated={true}
+        />
+
+        {/* Cookie consent still works before sign-in */}
+        <CookieBanner
+          isVisible={cookieConsent === null}
+          onAccept={handleAcceptCookies}
+          onReject={handleRejectCookies}
+          onOpenPreferences={handleOpenCookieModal}
+        />
+        <CookiePolicyModal
+          isOpen={isCookieModalOpen}
+          onClose={handleCloseCookieModal}
+          consent={cookieConsent}
+          onSaveConsent={handleSaveCustomConsent}
+        />
+      </div>
+    );
+  }
+
+  // ─── Authenticated App ────────────────────────────────────────────────────
+  // ─── Auth Gate: if not signed in, show only the auth page ──────────────────
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0B0B0C] text-white font-sans selection:bg-cyan-500 selection:text-black">
+        <AuthPage
+          initialMode={authMode}
+          onAuthSuccess={handleAuthSuccess}
+          onBackToHome={() => {
+            // On the auth gate, "back to home" stays on the auth page
+            // but we show the landing preview instead (no full nav)
+            setAuthMode("login");
+          }}
+          onOpenTracker={handleOpenTracker}
+        />
+
+        {/* Cookie consent still works before sign-in */}
+        <CookieBanner
+          isVisible={cookieConsent === null}
+          onAccept={handleAcceptCookies}
+          onReject={handleRejectCookies}
+          onOpenPreferences={handleOpenCookieModal}
+        />
+        <CookiePolicyModal
+          isOpen={isCookieModalOpen}
+          onClose={handleCloseCookieModal}
+          consent={cookieConsent}
+          onSaveConsent={handleSaveCustomConsent}
+        />
+      </div>
+    );
+  }
+
+  // ─── Authenticated App ────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0B0B0C] text-white flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
       
@@ -258,16 +425,19 @@ export function App() {
         }}
       />
 
-      {/* 1. Header Navigation Bar with 3D Motion Graphics */}
+      {/* 1. Header Navigation Bar with 3D Motion Graphics & Auth */}
       <Navbar 
         activeTab={activeTab} 
         setActiveTab={handleNavigate} 
         isCameraActive={isCameraActive} 
         onToggleCamera={toggleCamera}
         connectionStatus={connectionStatus}
+        user={user}
+        onLogout={handleLogout}
+        onOpenAuth={handleOpenAuth}
       />
 
-      {/* 2. Full Page Routing (Clean Dedicated Views - NO MODAL POPUPS) */}
+      {/* 2. Full Page Routing — all tabs accessible after sign-in */}
       <main className="flex-grow">
         {activeTab === "tracker" || activeTab === "live" ? (
           <TrackerPage 
@@ -311,6 +481,7 @@ export function App() {
               }}
               isCameraActive={isCameraActive} 
               onToggleCamera={toggleCamera}
+              onOpenAuth={handleOpenAuth}
             />
 
             {/* Home Bento Architecture Showcase Section */}
@@ -322,8 +493,30 @@ export function App() {
         )}
       </main>
 
-      {/* 3. Footer */}
-      <Footer />
+      {/* 3. Footer with Interactive Cookie Controls */}
+      <Footer 
+        onOpenAuth={handleOpenAuth}
+        cookieConsent={cookieConsent}
+        onAcceptCookies={handleAcceptCookies}
+        onRejectCookies={handleRejectCookies}
+        onOpenCookieModal={handleOpenCookieModal}
+      />
+
+      {/* 4. First-Visit Cookie & Privacy Consent Banner */}
+      <CookieBanner
+        isVisible={cookieConsent === null}
+        onAccept={handleAcceptCookies}
+        onReject={handleRejectCookies}
+        onOpenPreferences={handleOpenCookieModal}
+      />
+
+      {/* 5. Comprehensive Cookie & Privacy Policy Preferences Modal */}
+      <CookiePolicyModal
+        isOpen={isCookieModalOpen}
+        onClose={handleCloseCookieModal}
+        consent={cookieConsent}
+        onSaveConsent={handleSaveCustomConsent}
+      />
 
     </div>
   );

@@ -16,7 +16,7 @@ import {
  * Matching reference image: Black hoodie, pink wireframe glasses, cursor arrows, smiling face.
  */
 const VisionCharacter = () => (
-  <div className="relative w-48 h-56 flex flex-col items-center justify-end select-none group-hover:scale-105 transition-transform duration-500">
+  <div className="relative w-36 h-44 sm:w-48 sm:h-56 flex flex-col items-center justify-end select-none group-hover:scale-105 transition-transform duration-500">
     {/* Floating cursor selection frame around head */}
     <div className="absolute top-2 w-36 h-28 border-2 border-dashed border-white/60 rounded-2xl flex items-center justify-center pointer-events-none">
       {/* Corner bounding points */}
@@ -70,7 +70,7 @@ const VisionCharacter = () => (
  * Matching reference image: Blue hoodie, 3D red/cyan glasses, green speech bubble, cute smile.
  */
 const NeuralCharacter = () => (
-  <div className="relative w-48 h-56 flex flex-col items-center justify-end select-none group-hover:scale-105 transition-transform duration-500">
+  <div className="relative w-36 h-44 sm:w-48 sm:h-56 flex flex-col items-center justify-end select-none group-hover:scale-105 transition-transform duration-500">
     {/* Green Speech Bubble Floating Above Head */}
     <div className="absolute top-0 px-4 py-1.5 rounded-full bg-[#22C55E] text-zinc-950 text-xs font-black shadow-lg flex items-center gap-1.5 z-20 border border-green-300 animate-bounce" style={{ animationDuration: "3s" }}>
       <Sparkles className="w-3 h-3 text-zinc-950" />
@@ -116,7 +116,7 @@ const NeuralCharacter = () => (
  * Matching reference image: Acoustic foam background, metallic toaster head, boom mic, red hoodie.
  */
 const VoiceCharacter = () => (
-  <div className="relative w-48 h-56 flex flex-col items-center justify-end select-none group-hover:scale-105 transition-transform duration-500">
+  <div className="relative w-36 h-44 sm:w-48 sm:h-56 flex flex-col items-center justify-end select-none group-hover:scale-105 transition-transform duration-500">
     {/* Boom Microphone on Right Side */}
     <div className="absolute top-6 right-2 flex flex-col items-center z-30">
       <div className="w-5 h-8 bg-zinc-900 border border-zinc-600 rounded-md shadow-lg flex flex-col items-center justify-center p-0.5">
@@ -184,8 +184,8 @@ export const BentoSection = ({ onOpenTracker, onNavigate }) => {
           </div>
         </div>
 
-        {/* 3-COLUMN BENTO GRID (EXACT REFERENCE 3 CARDS LAYOUT) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        {/* 3-COLUMN BENTO GRID — responsive: 1 col mobile, 2 col md, 3 col lg */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
 
           {/* ========================================================= */}
           {/* CARD 1: CORAL RED VERTICAL CARD ("WGMI Jam" • 3 ETH)      */}
@@ -199,7 +199,7 @@ export const BentoSection = ({ onOpenTracker, onNavigate }) => {
             onClick={() => onNavigate ? onNavigate("architecture") : onOpenTracker()}
           >
             {/* Top Inner Section (Coral Red Container with 3D Character) */}
-            <div className="p-6 relative flex flex-col flex-grow min-h-[380px] items-center justify-between overflow-hidden">
+            <div className="p-6 relative flex flex-col flex-grow min-h-[300px] sm:min-h-[380px] items-center justify-between overflow-hidden">
               
               {/* Card Header Tag */}
               <div className="w-full flex items-center justify-between mb-2 z-10">
@@ -258,7 +258,7 @@ export const BentoSection = ({ onOpenTracker, onNavigate }) => {
             onClick={() => onNavigate ? onNavigate("architecture") : onOpenTracker()}
           >
             {/* Top Inner Section (Electric Blue Container with 3D Character) */}
-            <div className="p-6 relative flex flex-col flex-grow min-h-[380px] items-center justify-between overflow-hidden">
+            <div className="p-6 relative flex flex-col flex-grow min-h-[300px] sm:min-h-[380px] items-center justify-between overflow-hidden">
               
               {/* Card Header Tag */}
               <div className="w-full flex items-center justify-between mb-2 z-10">
@@ -317,7 +317,7 @@ export const BentoSection = ({ onOpenTracker, onNavigate }) => {
             onClick={() => onNavigate ? onNavigate("matrix") : onOpenTracker()}
           >
             {/* Top Inner Section (Charcoal Container with Foam Background & Mic Character) */}
-            <div className="p-6 relative flex flex-col flex-grow min-h-[380px] items-center justify-between overflow-hidden">
+            <div className="p-6 relative flex flex-col flex-grow min-h-[300px] sm:min-h-[380px] items-center justify-between overflow-hidden">
               
               {/* Card Header Tag */}
               <div className="w-full flex items-center justify-between mb-2 z-10">
