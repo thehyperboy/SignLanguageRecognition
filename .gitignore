@@ -60,3 +60,5 @@ yarn-debug.log*
 
 # Scratch / temporary test files
 scratch/
+
+.vercel

@@ -1,0 +1,8 @@
+{
+  "name": "sign-language-recognition",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run dev"
+  }
+}
